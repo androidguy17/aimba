@@ -1,0 +1,123 @@
+{
+  "weights": [
+    1.0088056858212122,
+    1.1109865482290469,
+    -1.7597551108626284,
+    -0.884055663376403,
+    -1.329162401411422,
+    0.6424386295432825
+  ],
+  "threshold": 0.85,
+  "version": "2.0",
+  "seed": 12,
+  "split_seed": 44,
+  "illustrative_apr": 0.12,
+  "training_bounds": {
+    "income": [
+      240000,
+      2400000
+    ],
+    "monthly_debt": [
+      0,
+      120000
+    ],
+    "loan_amount": [
+      50000,
+      1000000
+    ],
+    "term_months": [
+      12,
+      60
+    ],
+    "credit_score": [
+      520,
+      830
+    ],
+    "late_payments": [
+      0,
+      4
+    ],
+    "employment_years": [
+      0,
+      18
+    ]
+  },
+  "target": "simulated full repayment",
+  "training_n": 1440,
+  "validation_n": 480,
+  "test_n": 480,
+  "feature_names": [
+    "Credit score",
+    "Total debt-service ratio",
+    "Loan relative to income",
+    "Recent late payments",
+    "Employment years"
+  ],
+  "feature_means": [
+    -0.07350694444444444,
+    0.5871412061039335,
+    0.560388668610035,
+    0.27175925925925926,
+    0.8801180555555554
+  ],
+  "threshold_selection": "Lowest validation cost, 5 units per false approval and 1 per missed approval; ties favour lower threshold.",
+  "baseline_class": 0,
+  "test_metrics": {
+    "n": 480,
+    "accuracy": 0.6458333333333334,
+    "precision": 1.0,
+    "recall": 0.16666666666666666,
+    "f1": 0.2857142857142857,
+    "tp": 34,
+    "fp": 0,
+    "tn": 276,
+    "fn": 170,
+    "error_cost_units": 170,
+    "brier": 0.15691786247552028
+  },
+  "baseline_metrics": {
+    "n": 480,
+    "accuracy": 0.575,
+    "precision": 0,
+    "recall": 0.0,
+    "f1": 0,
+    "tp": 0,
+    "fp": 0,
+    "tn": 276,
+    "fn": 204,
+    "error_cost_units": 204,
+    "brier": null
+  },
+  "validation_metrics": {
+    "n": 480,
+    "accuracy": 0.6125,
+    "precision": 0.9375,
+    "recall": 0.19736842105263158,
+    "f1": 0.32608695652173914,
+    "tp": 45,
+    "fp": 3,
+    "tn": 249,
+    "fn": 183,
+    "error_cost_units": 198,
+    "brier": 0.1653114489765002
+  },
+  "test_at_050": {
+    "n": 480,
+    "accuracy": 0.7770833333333333,
+    "precision": 0.7389162561576355,
+    "recall": 0.7352941176470589,
+    "f1": 0.7371007371007371,
+    "tp": 150,
+    "fp": 53,
+    "tn": 223,
+    "fn": 54,
+    "error_cost_units": 319,
+    "brier": 0.15691786247552028
+  },
+  "limitations": [
+    "All outcomes are simulated; no real bank records were used.",
+    "The generator uses the same predictors as the classifier, so the task is favourable to this model.",
+    "The cost ratio and decision threshold are classroom assumptions.",
+    "Scores are not calibrated or validated for real lending; no demographic fairness claim is made."
+  ]
+}
