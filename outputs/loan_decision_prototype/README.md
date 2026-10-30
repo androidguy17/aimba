@@ -108,3 +108,6 @@ The extraction request sends the current application answer and requested field 
 ### Intake during service outages
 
 Common multi-detail sentences are now split into labeled facts and validated locally before any external extraction request. Recognized values are preserved and the next missing field is asked for, even if no language service is connected. Ambiguous duplicate values request clarification. If an uncommon phrase still needs the external service and that call fails, the app reports service unavailability, repeats the requested question and logs the sanitized provider error for the operator; it no longer presents an outage as an input-format mistake.
+
+
+The Conversation confirmation uses a short instruction to continue or edit details. The Policy tab in Streamlit and the local chat interface displays every clause from the same canonical, versioned policy used by assessments. It can be read without a language-service connection and includes privacy/data-use information. Existing chat histories also display the simplified confirmation wording.

@@ -65,7 +65,11 @@ def handler(app):
             else:
                 body+=f'''<h2>Human review</h2><form method="post" action="/review-case"><input type="hidden" name="csrf" value="{self.session['csrf']}"><input type="hidden" name="case_id" value="{html.escape(cid)}"><select name="decision"><option>More information required</option><option>Rejected</option><option>Approved</option></select><p><textarea name="note" minlength="20" required placeholder="Officer reason, at least 20 characters"></textarea></p><p><label><input type="checkbox" name="reviewed" value="yes" required> I reviewed the facts and policy</label></p><p><label><input type="checkbox" name="exception" value="yes"> I acknowledge a policy exception, if needed</label></p><button>Record decision</button></form>'''
             return self.reply('<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Case review</title><style>body{font:16px Arial;max-width:800px;margin:2em auto;padding:1em;line-height:1.5}textarea{width:100%;min-height:90px}li{margin:1em 0}</style></head><body><p><a href="/">← Back to chat</a></p>'+body+'</body></html>',ctype='text/html; charset=utf-8')
-        if self.path in ('/','/chat'):return self.reply((ROOT/'chat.html').read_text(),ctype='text/html; charset=utf-8')
+        if self.path in ('/','/chat'):
+            policy_html='<h1>Lending policy</h1><p>Cedar Demo Bank · Version '+html.escape(str(app.policy.version))+'</p><p>Fictional educational policy. Every recommendation requires human review.</p>'
+            policy_html+=''.join('<article><h2>'+html.escape(c['id']+' · '+c['title'])+'</h2><p>'+html.escape(c['text'])+'</p></article>' for c in app.policy.clauses)
+            policy_html+='<h2>Privacy and data use</h2><p>Use sample details only. Loan questions, answers that need interpretation and submitted assessment details may be sent to an external AI service. Submitted cases are stored for demonstration review. Do not enter names, identity numbers or real financial records.</p>'
+            return self.reply((ROOT/'chat.html').read_text().replace('<!--POLICY_CONTENT-->',policy_html),ctype='text/html; charset=utf-8')
         if self.path=='/chat.js':return self.reply((ROOT/'chat.js').read_text(),ctype='application/javascript; charset=utf-8')
         if self.path=='/chat.css':return self.reply((ROOT/'chat.css').read_text(),ctype='text/css; charset=utf-8')
         if self.path=='/api/state':return self.reply(json.dumps(self.state()))

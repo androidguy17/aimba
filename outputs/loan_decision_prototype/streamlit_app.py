@@ -52,10 +52,6 @@ def process(text):
 with st.sidebar:
     st.title('🌿 Cedar')
     st.caption('Team 12 · Educational loan assistant')
-    if key:
-        st.success('Explanations enabled')
-    else:
-        st.info('Policy guidance available. Explanations are not connected.')
     if st.button('＋ New conversation', use_container_width=True):
         st.session_state.conversation = chatbot.new_state()
         st.session_state.pop('notice', None)
@@ -76,12 +72,12 @@ with st.sidebar:
             process('Start over')
             st.rerun()
     st.divider()
-    st.caption('Use synthetic details only. Loan questions, application answers that need interpretation, and submitted assessment details may be sent to an external AI service. Cases are temporary on cloud hosting.')
+    st.caption('Use sample details only. See Policy for privacy and data use.')
 
 st.title('Chat with Cedar')
 st.caption('Ask about loan eligibility, fictional lending policy, or an assessment.')
 st.info('Cedar supports lending questions only. Policy answers show source clauses; assessments need human review.')
-chat_tab, cases_tab = st.tabs(['Conversation', 'My demo cases'])
+chat_tab, policy_tab, cases_tab = st.tabs(['Conversation', 'Policy', 'My demo cases'])
 with chat_tab:
     for message in chatbot.grouped_messages(state['messages']):
         user = message['role'] == 'user'
@@ -104,6 +100,16 @@ with chat_tab:
                 st.caption('Case '+message['case_id'][:8]+' · open My demo cases to review')
     if st.session_state.get('notice'):
         st.error(st.session_state.notice)
+with policy_tab:
+    st.subheader('Lending policy')
+    st.caption('Cedar Demo Bank · Policy version '+str(app.policy.version))
+    st.write('Read the policy used for eligibility assessments. This is a fictional policy for an educational demonstration; every recommendation requires human review.')
+    for clause in app.policy.clauses:
+        with st.expander(clause['id']+' · '+clause['title'], expanded=True):
+            st.text(clause['text'])
+    with st.expander('Privacy and data use'):
+        st.write('Use sample details only. Loan questions, answers that need interpretation and submitted assessment details may be sent to an external AI service. Submitted cases are stored for demonstration review and may be temporary on cloud hosting. Do not enter names, identity numbers or real financial records.')
+
 with cases_tab:
     cases = app.store.list_cases(st.session_state.owner)
     if not cases:

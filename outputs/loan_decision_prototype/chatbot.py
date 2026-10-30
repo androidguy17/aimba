@@ -12,12 +12,17 @@ FIELDS=[('income','How much do you earn? You can say “16 lakh per year” or �
  ('employment_type','How do you work — are you salaried, self-employed, or a freelancer?')]
 WELCOME='Hi! I’m Cedar’s loan assistant. Ask about our fictional lending policy or choose Check my eligibility. I can help only with loans and policy guidance. Every recommendation needs human review. Use synthetic examples only.'
 
+CONFIRM_HELP='Choose Confirm assessment to continue, or Start over to change your details.'
+
 def new_state():return {'messages':[{'role':'assistant','text':WELCOME,'kind':'welcome'}],'draft':None,'step':0,'previous_question':'','last_assessment':None,'busy':False}
 def grouped_messages(messages):
     """One assistant bubble per user turn, including history from older sessions."""
     grouped=[]
     for message in messages:
         message=dict(message)
+        if message['role']=='assistant':
+            message['text']=re.sub(r'Choose Confirm assessment to run the local model\..*?Choose Start over to change them\.',CONFIRM_HELP,message['text'],flags=re.S)
+            message['text']=message['text'].replace('Please check these synthetic details before I assess them:', 'Please review your details:')
         if grouped and message['role']=='assistant' and grouped[-1]['role']=='assistant':
             text=grouped[-1]['text']+'\n\n'+message['text']
             grouped[-1].update(message)
@@ -41,11 +46,11 @@ def understood(name,value):
     return name.replace('_',' ').capitalize()+f': {value:g}'+unit
 
 def summary(state):
-    x=state['draft'];lines=['Please check these synthetic details before I assess them:']
+    x=state['draft'];lines=['Please review your details:']
     for key,_ in FIELDS:
         value=x[key];label=key.replace('_',' ').title()
         lines.append(f'{label}: {value:,}' if isinstance(value,(int,float)) else f'{label}: {value.replace("_"," ")}')
-    lines.append('Choose Confirm assessment to run the local model. If explanations are enabled, these values and policy evidence will also be sent to an external AI service. Choose Start over to change them.')
+    lines.append(CONFIRM_HELP)
     add(state,'\n'.join(lines),kind='confirm')
 
 def handle(state,text,app,owner,key):

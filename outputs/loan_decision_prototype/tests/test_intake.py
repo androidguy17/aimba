@@ -145,6 +145,18 @@ class IntakeTests(unittest.TestCase):
         self.assertEqual(state['draft']['loan_amount'],500000)
         self.assertEqual(state['step'],1)
 
+    def test_confirmation_is_simple_in_new_and_existing_conversations(self):
+        from loan_core import DEMO_CASES
+        state=chatbot.new_state();state['draft']=dict(DEMO_CASES['approval'])
+        chatbot.summary(state)
+        self.assertIn('Choose Confirm assessment to continue',state['messages'][-1]['text'])
+        self.assertNotIn('local model',state['messages'][-1]['text'])
+        self.assertNotIn('external AI service',state['messages'][-1]['text'])
+        previous='Choose Confirm assessment to run the local model. If explanations are enabled, these values and policy evidence will also be sent to an external AI service. Choose Start over to change them.'
+        history=[{'role':'assistant','text':previous,'kind':'confirm'}]
+        self.assertEqual(chatbot.grouped_messages(history)[0]['text'],chatbot.CONFIRM_HELP)
+        self.assertEqual(history[0]['text'],previous)
+
     def test_each_intake_turn_is_one_complete_assistant_reply(self):
         from loan_core import DEMO_CASES
         state=chatbot.new_state();app=SimpleNamespace(policy=Policy())
@@ -161,7 +173,7 @@ class IntakeTests(unittest.TestCase):
         self.assertEqual(len(state['messages'])-before,2)
         self.assertEqual(state['messages'][-1]['kind'],'confirm')
         self.assertIn('Employment: salaried',state['messages'][-1]['text'])
-        self.assertIn('Please check these synthetic details',state['messages'][-1]['text'])
+        self.assertIn('Please review your details:',state['messages'][-1]['text'])
 
     def test_policy_question_during_application_does_not_consume_a_field(self):
         state=chatbot.new_state();app=SimpleNamespace(policy=Policy())

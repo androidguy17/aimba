@@ -43,3 +43,12 @@ document.getElementById('composer').addEventListener('submit',e=>{e.preventDefau
 document.querySelectorAll('[data-send]').forEach(b=>b.addEventListener('click',()=>send(b.dataset.send)));
 document.getElementById('new-chat').addEventListener('click',reset);
 busy(true,'Connecting to local app…');fetch('/api/state').then(r=>{if(!r.ok)throw Error('Could not connect');return r.json()}).then(s=>{render(s,true);busy(false,'Ready')}).catch(()=>{error.textContent='Could not connect to the local server. Refresh to retry.';busy(false,'Disconnected')});
+
+const sectionTabs=[...document.querySelectorAll('[data-panel]')];
+function selectSection(tab){
+ for(const item of sectionTabs){const selected=item===tab;item.setAttribute('aria-selected',String(selected));item.tabIndex=selected?0:-1;document.getElementById(item.dataset.panel).hidden=!selected}
+}
+for(const tab of sectionTabs){
+ tab.addEventListener('click',()=>selectSection(tab));
+ tab.addEventListener('keydown',event=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){event.preventDefault();const index=sectionTabs.indexOf(tab);const next=event.key==='Home'?0:event.key==='End'?sectionTabs.length-1:(index+(event.key==='ArrowRight'?1:-1)+sectionTabs.length)%sectionTabs.length;selectSection(sectionTabs[next]);sectionTabs[next].focus()}})
+}

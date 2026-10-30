@@ -153,6 +153,22 @@ class ChatHTTPTests(unittest.TestCase):
             self.assertNotIn('Ask anything',text)
             self.assertNotIn('Groq',text)
 
+    def test_policy_tab_reads_all_current_clauses_without_provider(self):
+        import html
+        import json
+        import http.cookiejar
+        from urllib.request import build_opener,HTTPCookieProcessor
+        client=build_opener(HTTPCookieProcessor(http.cookiejar.CookieJar()))
+        before=json.load(client.open(self.url+'/api/state'))['messages']
+        with patch('groq_rag.complete') as provider:
+            page=client.open(self.url+'/').read().decode()
+            provider.assert_not_called()
+        self.assertIn('id="policy-tab"',page)
+        self.assertIn('aria-controls="policy-panel"',page)
+        for clause in self.app.policy.clauses:
+            self.assertIn(clause['text'],html.unescape(page))
+        self.assertEqual(json.load(client.open(self.url+'/api/state'))['messages'],before)
+
 
 if __name__=='__main__':
     unittest.main()
