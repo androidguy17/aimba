@@ -111,3 +111,8 @@ Common multi-detail sentences are now split into labeled facts and validated loc
 
 
 The Conversation confirmation uses a short instruction to continue or edit details. The Policy tab in Streamlit and the local chat interface displays every clause from the same canonical, versioned policy used by assessments. It can be read without a language-service connection and includes privacy/data-use information. Existing chat histories also display the simplified confirmation wording.
+
+
+### Eligibility intent and specific policy questions
+
+`chat_intent.py` routes a personal loan request or general interest-rate enquiry into the eligibility conversation. Greetings and introductions can precede the request, and supplied amounts are recorded whether they appear before or after the word “loan”. The app asks for missing details and does not invent a personalized rate. Explicit policy, document, threshold, calculation and product-scope questions use retrieval. A policy detour during an application preserves all draft values and resumes the next unanswered field. Common routing and intake formats work without a language-service connection; unrelated instruction requests remain blocked.

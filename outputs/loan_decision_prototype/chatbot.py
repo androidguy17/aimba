@@ -1,6 +1,6 @@
 """Session-local conversation state. Financial decisions always use the existing ML model."""
 import re, math
-import loan_core,groq_rag,guardrails,intake
+import loan_core,groq_rag,guardrails,intake,chat_intent
 
 FIELDS=[('income','How much do you earn? You can say “16 lakh per year” or “50k a month”; I’ll convert it to annual income in rupees.'),
  ('monthly_debt','How much do you pay toward existing debt each month? For example, “my EMIs are 10k” or “no debt”.'),
@@ -81,16 +81,23 @@ def handle(state,text,app,owner,key):
         state['last_assessment']={'recommendation':assessment['recommendation'],'input':assessment['input'],'flags':assessment['flags'],'scope_supported':assessment['scope_supported']}
         state['previous_question']='loan assessment recommendation '+assessment['recommendation']+' '+ ' '.join(f['message'] for f in assessment['flags'])
         state['draft']=None;state['step']=0;return
-    # A natural loan request may start intake and supply facts in the same turn.
-    if state['draft'] is None and re.match(r'(?i)^(?:check my eligibility\b|i (?:want|need|would like)(?: to (?:borrow|apply))?(?: a)? loan\b|i want to borrow\b)',text) and re.search(r'(?i)\d|\b(lakh|lac|thousand|income|salary|score)\b',text):
+    intent=chat_intent.classify(text,state['draft'] is not None,state['previous_question'])
+    if intent=='blocked':
+        add(state,guardrails.REFUSAL,kind='loan assistant');return
+    if intent=='decline':
+        add(state,'No problem. You can ask about our lending policies, or let me know if you want to check eligibility later.',kind='guide');return
+    started=intent=='eligibility' and state['draft'] is None
+    if started:
         state['draft']={};state['step']=0
         add(state,'Let’s check your eligibility. I’ll record the details you share and ask for anything missing.',kind='guide')
-    # Interpret application facts before policy routing, including complete sentences.
+    if intent=='eligibility' and chat_intent.RATE.search(text):
+        add(state,'Any interest rate or loan offer needs confirmation from a loan officer. I can help you complete an eligibility assessment first.',kind='guide')
     active=state['draft'] is not None
-    policy_question=bool(re.match(r'(?i)^(?:/?ask |what (?:is|are)|how (?:does|do)|why |can (?:i|you)|is (?:there|it))',text))
-    if policy_question and re.search(r'(?i)\b(my|i earn|i make|i pay|i have)\b',text) and re.search(r'(?i)\d|\b(one|two|three|four|five|six|seven|eight|nine|ten|hundred|thousand|lakh|lac)\b',text):
-        policy_question=False
-    if active and not policy_question:
+    if active and intent in ('eligibility','continue'):
+        if intent=='eligibility' and not chat_intent.has_details(text):
+            if state['step']==len(FIELDS):summary(state)
+            else:add(state,FIELDS[state['step']][1],kind='question')
+            return
         field=FIELDS[min(state['step'],len(FIELDS)-1)][0]
         if state['step']==len(FIELDS) and command in ('yes','ok','confirm'):
             add(state,'Please use the Confirm assessment button to submit the values shown above.',kind='guide');return

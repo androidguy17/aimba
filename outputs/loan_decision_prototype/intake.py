@@ -20,7 +20,7 @@ BAD = re.compile(r'ignore|disregard|override|jailbreak|system\s*(prompt|message)
 
 
 def clean(text):
-    return unicodedata.normalize('NFKC',text).casefold().replace('’',"'").strip()
+    return unicodedata.normalize('NFKC',text).casefold().replace('’',"'").replace("i'm",'i am').strip()
 
 
 def validate(value, field):
@@ -71,6 +71,8 @@ def numeric(text, field, check=True):
     normalized = re.sub(r'\band a half\b','point five',normalized)
     normalized = re.sub(r'\bhalf a[n]?\b','0.5',normalized)
     normalized = re.sub(r'\b(?:a )?couple of\b','two',normalized)
+    number_starts='|'.join(re.escape(w) for w in ONES)
+    normalized=re.sub(r'\b(?:a|an)\s+(?=(?:\d+|'+number_starts+r')\b)','',normalized)
     tokens = re.findall(r'\d+(?:\.\d+)?|[a-z]+',normalized)
     spans=[]; current=[]
     for token in tokens+['END']:
@@ -147,8 +149,18 @@ def local_facts(text):
         try:
             value=employment(span) if name=='employment_type' else numeric(span,name)
         except Clarify as exc:
-            errors[name]=exc
-            continue
+            if name=='loan_amount' and not re.search(r'\d|\b(?:'+ '|'.join(ONES)+r'|lakh|lac|thousand)\b',span):
+                # In 'I want 10 lac loan', the amount appears before the label.
+                prefix=text[:match.start()]
+                prefix=re.split(r'\b(?:want|need|borrow|like|get|looking for)\b',prefix)[-1]
+                try:
+                    value=numeric(prefix,'loan_amount')
+                except Clarify as prefix_error:
+                    errors[name]=prefix_error if isinstance(prefix_error,UnsupportedValue) else exc
+                    continue
+            else:
+                errors[name]=exc
+                continue
         if name in values and values[name]!=value:
             raise Clarify('I found different values for your '+name.replace('_',' ')+'. Which one should I use?')
         values[name]=value
