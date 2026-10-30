@@ -8,7 +8,7 @@ Run `streamlit run streamlit_app.py`. See [DEPLOY_STREAMLIT.md](DEPLOY_STREAMLIT
 
 Add your Groq API key in the `.env` file in this folder: `GROQ_API_KEY=your_key_here`. The default model is `openai/gpt-oss-20b`, listed in Groq's free-plan limits. The app reads `.env` when it starts; restart it after changing the key. Keep `.env` private; `.env.example` is a shareable template.
 
-The chatbot reuses the trained logistic regression model and fictional Cedar Demo Bank policy. It handles policy questions with retrieved clauses, asks for the applicant's details conversationally, and shows a provisional recommendation. Groq writes a cited explanation only when connected. Open a submitted case to record the human reviewer decision. Use synthetic applicants only.
+The chatbot reuses the trained logistic regression model and fictional Cedar Demo Bank policy. It handles only loan-policy questions with trusted source clauses, asks for the applicant's details conversationally, and shows a provisional recommendation. Groq writes a cited explanation only when connected. Open a submitted case to record the human reviewer decision. Use synthetic applicants only.
 
 ---
 
@@ -83,3 +83,14 @@ The script writes `evaluation/llm_review.csv` and full case/prompt/output snapsh
 The app stores synthetic cases in `data/demo.sqlite3`. This folder, the evaluation results and secrets are excluded from the ZIP and Git. The demo session owns its cases; authenticated officers can view the review queue. Sessions last 12 hours and reset when the server restarts. Reviewer audit events persist in SQLite.
 
 For hosting, configure `HOST=0.0.0.0`, a platform `PORT`, a strong `REVIEWER_PASSWORD`, and `OPENROUTER_API_KEY` as secrets. Set `COOKIE_SECURE=1` only behind HTTPS and set `LOAN_DB_PATH` to a persistent volume. `Dockerfile` and `Procfile` are supplied. A public URL has not been created. This classroom server is not hardened for real applicant traffic.
+
+
+## Lending-only guardrails
+
+Both the local chatbot and Streamlit use `guardrails.py` and the same server-side response path. General writing, emails, coding, provider questions and common instruction overrides receive a fixed scope reminder. Guided financial fields accept validated numbers or fixed employment choices; those values cannot become model instructions.
+
+For policy chat the model can select up to three retrieved clause IDs. The server validates the complete response schema and renders only the canonical policy text. No model-authored chat prose is displayed. Empty evidence returns a policy-gap notice, malformed selections are withheld, and policy guidance works without a provider key. The model does not receive conversation history. Short follow-ups use only the last accepted lending question.
+
+Assessment explanations are a separate, fixed-purpose task using validated application fields. Existing checks preserve the provisional recommendation, exact citations and human review. Public response checks also withhold the excluded brand name, including common Unicode and punctuation variations. Dashboard labels use Cedar branding; demo-data and external-service disclosures remain accurate.
+
+Run `python3 -m unittest discover -s tests -v` from this folder. Tests cover off-topic requests, loan-keyword bait, instruction overrides, malformed model outputs, history poisoning, brand-name variants and the application flow. These controls limit output capability; keyword matching alone is not a security guarantee. Assessment prose still needs human factual review. Policy files are trusted operator-controlled content. A running or hosted instance must be restarted or redeployed after updating these files; existing browser sessions should start a new conversation.

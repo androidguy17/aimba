@@ -53,10 +53,9 @@ with st.sidebar:
     st.title('🌿 Cedar')
     st.caption('Team 12 · Educational loan assistant')
     if key:
-        st.success('Groq key configured')
+        st.success('Explanations enabled')
     else:
-        st.warning('Groq key missing. Set GROQ_API_KEY in app secrets.')
-    st.caption('Model: '+os.environ['GROQ_MODEL'])
+        st.info('Policy guidance available. Explanations are not connected.')
     if st.button('＋ New conversation', use_container_width=True):
         st.session_state.conversation = chatbot.new_state()
         st.session_state.pop('notice', None)
@@ -77,21 +76,21 @@ with st.sidebar:
             process('Start over')
             st.rerun()
     st.divider()
-    st.caption('Use synthetic details only. Messages, recent conversation and submitted assessment details are sent to Groq. Cases are temporary on cloud hosting.')
+    st.caption('Use synthetic details only. Loan questions and submitted assessment details may be sent to an external AI service for policy selection and explanations. Cases are temporary on cloud hosting.')
 
 st.title('Chat with Cedar')
-st.caption('Ask anything, explore fictional lending policy, or try a loan assessment.')
-st.info('✦ Groq AI = generated reply · App = guided steps · Assessment = local model with a Groq explanation when available.')
+st.caption('Ask about loan eligibility, fictional lending policy, or an assessment.')
+st.info('Cedar supports lending questions only. Policy answers show source clauses; assessments need human review.')
 chat_tab, cases_tab = st.tabs(['Conversation', 'My demo cases'])
 with chat_tab:
     for message in state['messages']:
         user = message['role'] == 'user'
         kind = message.get('kind', 'guide')
-        generated = kind.startswith('Groq')
+        generated = kind == 'assessment explanation'
         with st.chat_message('user' if user else 'assistant', avatar=None if user else '🌿'):
             if not user:
-                label = ('Assessment · local model + Groq AI explanation' if message.get('case_id') and generated
-                         else '✦ '+kind if generated else 'App · '+kind)
+                label = ('Assessment · provisional explanation' if message.get('case_id') and generated
+                         else 'Cedar · '+kind)
                 st.caption(label)
             st.text(message['text'])
             if message.get('sources'):
@@ -100,7 +99,7 @@ with chat_tab:
                         st.markdown('**'+clause['id']+' · '+clause['title']+'**')
                         st.text(clause['text'])
             if message.get('usage'):
-                st.caption('Verified Groq response · '+str(message['usage'].get('total_tokens', '—'))+' tokens')
+                st.caption('Response · '+str(message['usage'].get('total_tokens', '—'))+' tokens')
             if message.get('case_id'):
                 st.caption('Case '+message['case_id'][:8]+' · open My demo cases to review')
     if st.session_state.get('notice'):

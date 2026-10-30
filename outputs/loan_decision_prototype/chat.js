@@ -2,10 +2,10 @@ let csrf='',pending=false,ready=false,connected=false;
 const feed=document.getElementById('feed'),error=document.getElementById('error'),input=document.getElementById('message'),status=document.getElementById('activity');
 let rows=[];
 function bubble(m,animate=false){
- const el=document.createElement('div');const ai=m.role!=='user'&&m.kind?.startsWith('Groq');
+ const el=document.createElement('div');const ai=m.role!=='user'&&m.kind==='assessment explanation';
  el.className='bubble '+(m.role==='user'?'user':ai?'assistant ai':'assistant app-message')+(animate?' enter':'');
  const meta=document.createElement('div');meta.className='meta';
- meta.textContent=m.role==='user'?'You':ai?'✦ Groq AI · '+(m.model||m.kind.replace('Groq · ','').replace('Groq explanation + local model','AI explanation + local assessment')):'App · '+(m.kind||'guide');
+ meta.textContent=m.role==='user'?'You':'Cedar · '+(m.kind||'loan assistant');
  const content=document.createElement('div');content.className='message-text';content.textContent=m.text;el.append(meta,content);
  if(m.sources?.length){const details=document.createElement('details');details.className='sources';const summary=document.createElement('summary');summary.textContent='Policy evidence · '+m.sources.length+' clauses';details.append(summary);for(const c of m.sources){const article=document.createElement('article'),title=document.createElement('b'),p=document.createElement('p');title.textContent=c.id+' · '+c.title;p.textContent=c.text;article.append(title,p);details.append(article)}el.append(details)}
  if(m.case_id){const link=document.createElement('a');link.className='case';link.href='/case?id='+encodeURIComponent(m.case_id);link.textContent='Open case · human review pending ↗';el.append(link)}return el;
@@ -13,7 +13,7 @@ function bubble(m,animate=false){
 function scrollDown(){feed.scrollTo({top:feed.scrollHeight,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'})}
 function render(s,initial=false){
  csrf=s.csrf;connected=s.connected;ready=s.ready;
- const badge=document.getElementById('connection');badge.textContent=s.connected?'Groq configured · '+s.model:'Groq not configured';badge.classList.toggle('off',!s.connected);
+ const badge=document.getElementById('connection');badge.textContent=s.connected?'Explanations enabled':'Policy guidance available';badge.classList.toggle('off',!s.connected);
  document.getElementById('confirm').classList.toggle('show',s.ready);
  const nearBottom=feed.scrollHeight-feed.scrollTop-feed.clientHeight<100;
  const keys=s.messages.map(m=>JSON.stringify(m));let common=0;while(common<rows.length&&common<keys.length&&rows[common].key===keys[common])common++;
@@ -31,7 +31,7 @@ async function send(raw){
  const local=['start over','check my eligibility','demo approval','demo rejection','demo edge','confirm assessment'].includes(text.toLowerCase());
  busy(true,local?'Processing application…':'Waiting for response…');
  const typing=document.createElement('div');typing.className='typing';typing.setAttribute('role','status');typing.innerHTML='<span></span><span></span><span></span><small>Processing your message</small>';feed.append(typing);scrollDown();
- try{const r=await fetch('/api/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({csrf,text})});const data=await r.json();if(!r.ok)throw Error(data.error||'Request failed');optimistic.remove();typing.remove();render(data);scrollDown();status.textContent=data.messages.at(-1)?.kind?.startsWith('Groq')?'Groq AI replied':'App updated'}
+ try{const r=await fetch('/api/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({csrf,text})});const data=await r.json();if(!r.ok)throw Error(data.error||'Request failed');optimistic.remove();typing.remove();render(data);scrollDown();status.textContent='Cedar replied'}
  catch(e){optimistic.remove();typing.remove();error.textContent=e.message; if(!input.value)input.value=submitted||text;status.textContent='Message failed — try again'}
  finally{busy(false,status.textContent);input.focus()}
 }

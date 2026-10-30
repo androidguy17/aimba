@@ -1,6 +1,6 @@
 """Session-local conversation state. Financial decisions always use the existing ML model."""
 import re, math
-import loan_core,groq_rag
+import loan_core,groq_rag,guardrails
 
 FIELDS=[('income','What is your annual gross income in INR? Example: 1440000.'),
  ('monthly_debt','How much do you already pay toward debt each month, in INR? Example: 5000.'),
@@ -10,7 +10,7 @@ FIELDS=[('income','What is your annual gross income in INR? Example: 1440000.'),
  ('late_payments','How many late payments have you had in the last 12 months? Example: 0.'),
  ('employment_years','How many years of employment experience do you have? Example: 10.'),
  ('employment_type','Are you salaried or self-employed?')]
-WELCOME='Hi! I’m Cedar’s loan assistant. You can chat with me about anything, ask about our fictional lending policy, or choose Check my eligibility. I’ll collect the details, run our supervised model and show the policy evidence. Every recommendation needs human review. Use synthetic examples only.'
+WELCOME='Hi! I’m Cedar’s loan assistant. Ask about our fictional lending policy or choose Check my eligibility. I can help only with loans and policy guidance. Every recommendation needs human review. Use synthetic examples only.'
 
 def new_state():return {'messages':[{'role':'assistant','text':WELCOME,'kind':'welcome'}],'draft':None,'step':0,'previous_question':'','last_assessment':None,'busy':False}
 def add(state,text,role='assistant',**extras):
@@ -36,7 +36,7 @@ def summary(state):
     for key,_ in FIELDS:
         value=x[key];label=key.replace('_',' ').title()
         lines.append(f'{label}: {value:,}' if isinstance(value,(int,float)) else f'{label}: {value.replace("_"," ")}')
-    lines.append('Choose Confirm assessment to run the local model. If Groq is connected, these values and policy evidence will also be sent to Groq. Choose Start over to change them.')
+    lines.append('Choose Confirm assessment to run the local model. If explanations are enabled, these values and policy evidence will also be sent to an external AI service. Choose Start over to change them.')
     add(state,'\n'.join(lines),kind='confirm')
 
 def handle(state,text,app,owner,key):
@@ -63,8 +63,9 @@ def handle(state,text,app,owner,key):
         if generation['status']=='generated':
             message+='\n\n'+generation['draft']['summary']+'\n\n'+'\n'.join(f'[{r["clause_id"]}] {r["explanation"]}' for r in generation['draft']['reasons'])
         else:message+='\n\n'+generation['message']
-        add(state,message,kind='Groq explanation + local model' if generation['status']=='generated' else 'local model · no LLM explanation',sources=assessment['evidence'],case_id=cid)
+        add(state,message,kind='assessment explanation' if generation['status']=='generated' else 'local assessment',sources=assessment['evidence'],case_id=cid)
         state['last_assessment']={'recommendation':assessment['recommendation'],'input':assessment['input'],'flags':assessment['flags'],'scope_supported':assessment['scope_supported']}
+        state['previous_question']='loan assessment recommendation '+assessment['recommendation']+' '+ ' '.join(f['message'] for f in assessment['flags'])
         state['draft']=None;state['step']=0;return
     # A question during the guided application does not overwrite the requested financial field.
     if state['draft'] is not None and state['step']<len(FIELDS) and '?' not in text and not command.startswith(('ask ','/ask ')):
@@ -77,8 +78,9 @@ def handle(state,text,app,owner,key):
             state['draft'][field]=value;state['step']+=1
             if state['step']==len(FIELDS):summary(state)
             else:add(state,FIELDS[state['step']][1],kind='question')
-        except ValueError:
-            pass  # Free text during an application still goes to Groq.
+        except ValueError as exc:
+            if not any(c.isalpha() for c in text) or field=='employment_type':
+                add(state,str(exc),kind='question');return
         else:
             return
     if state['draft'] is not None and state['step']==len(FIELDS) and command in ('yes','ok','confirm'):
@@ -86,5 +88,7 @@ def handle(state,text,app,owner,key):
     question=re.sub(r'^/?ask\s+','',text,flags=re.I)
     try:result=groq_rag.answer(question,app.policy,key,state['previous_question'],state['last_assessment'],history=state['messages'][:-1])
     except groq_rag.GroqError as exc:result={'text':str(exc),'kind':'connection or evidence check','sources':[]}
-    add(state,**result);state['previous_question']=question
+    add(state,**result)
+    if result.get('sources') and guardrails.canonical(question) not in guardrails.FOLLOWUPS:
+        state['previous_question']=question
     if state['draft'] is not None and state['step']<len(FIELDS):add(state,'When you’re ready: '+FIELDS[state['step']][1],kind='question')
