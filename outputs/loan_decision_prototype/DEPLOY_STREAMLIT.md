@@ -10,9 +10,9 @@ GROQ_API_KEY = "your_actual_key"
 GROQ_MODEL = "openai/gpt-oss-20b"
 ```
 
-5. Deploy. Test a greeting, a lending-policy question and follow-up, Demo approval → Confirm assessment, My demo cases, and New conversation. Verify that an email request and an instruction-override request receive the lending-only reminder. Include `guardrails.py` in the deployment.
+5. Deploy. Test a greeting, a lending-policy question and follow-up, a complete sample application → Submit application, My applications, and New conversation. Verify that an email request and an instruction-override request receive the lending-only reminder. Include `guardrails.py` and `customer_guidance.py` in the deployment.
 
-The key stays on the server. Never commit it or paste it into chat. Groq account quotas still apply. Chat state is per browser session; a disconnected or reloaded session may reset it. SQLite case storage is temporary on Community Cloud; export any demo evidence you need before restarting. Only the current session's cases appear in My demo cases. Reviewer controls are classroom role-play.
+The key stays on the server. Never commit it or paste it into chat. Groq account quotas still apply. Chat state is per browser session; a disconnected or reloaded session may reset it. SQLite case storage is temporary on Community Cloud; export any demo evidence you need before restarting. Only the current session's cases appear in My demo cases. Customer sessions cannot record reviewer decisions. This deployment has no document or credit-bureau verification integration.
 
 ## Local run from workspace root
 

@@ -2,6 +2,7 @@
 import json, os, urllib.request, urllib.error
 from rag import SYSTEM_PROMPT, validate_draft, normalize
 import guardrails
+from customer_guidance import public_clause, PRIVATE_RULES_MESSAGE
 
 DEFAULT_MODEL='openai/gpt-oss-20b'
 class GroqError(Exception): pass
@@ -65,7 +66,11 @@ def answer(question,policy,key,previous='',assessment=None,history=None):
         return {'text':guardrails.GREETING if intent == 'greeting' else guardrails.REFUSAL,
                 'kind':'loan assistant','sources':[]}
     query = previous if guardrails.canonical(question) in guardrails.FOLLOWUPS else question
-    evidence = policy.search(query, k=4)
+    if guardrails.requests_internal_rules(query):
+        return {'text':PRIVATE_RULES_MESSAGE,'kind':'application guidance','sources':[], 'topic':True}
+    # Retrieve internally, then replace content BEFORE building any model payload.
+    evidence = [public_clause(c) for c in policy.search(query, k=4)]
+    evidence = [c for c in evidence if c]
     if not evidence:
         return {'text':guardrails.GAP,'kind':'policy guidance','sources':[]}
     selected = evidence[:3]
@@ -79,6 +84,6 @@ def answer(question,policy,key,previous='',assessment=None,history=None):
             raise GroqError('The response failed policy checks. Please ask a lending-policy question.')
         selected = [by_id[cid] for cid in dict.fromkeys(ids)]
     # This is the output boundary: no model-authored strings are ever displayed.
-    text = '\n\n'.join('['+c['id']+'] '+c['title']+'\n'+c['text'] for c in selected)
+    text = '\n\n'.join(c['title']+'\n'+c['text'] for c in selected)
     guardrails.validate_public_text(text)
-    return {'text':text or guardrails.GAP,'kind':'policy guidance','sources':selected}
+    return {'text':text or guardrails.GAP,'kind':'application guidance','sources':[], 'topic':bool(selected)}
