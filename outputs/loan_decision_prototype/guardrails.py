@@ -34,8 +34,3 @@ def validate_public_text(text):
     compact = ''.join(c for c in canonical(text) if c.isalnum())
     if 'syntheticai' in compact:
         raise ValueError('Explanation failed the public response checks.')
-
-
-def requests_internal_rules(text):
-    value = canonical(text)
-    return bool(re.search(r'cut.?off|threshold|formula|weight|coefficient|internal|exact|minimum|maximum|percent|percentage|\b[0-9]+\s*%|\bp0[1-9]\b|what.{0,30}(enter|change|increase|decrease).{0,50}(approv|qualif)|guarantee.{0,20}approv', value))

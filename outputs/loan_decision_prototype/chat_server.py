@@ -7,7 +7,6 @@ from urllib.parse import urlsplit,parse_qs
 import loan_core,chatbot,groq_rag
 from policy import Policy
 from storage import Store
-from customer_guidance import VERSION, public_case
 ROOT=Path(__file__).parent
 
 def load_env():
@@ -47,11 +46,7 @@ def handler(app):
         self.send_header('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'")
         self.send_header('Set-Cookie',f'cedar_chat={self.token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=43200')
         self.end_headers();self.wfile.write(data)
-    def setup_session(self):
-        self.token,self.session=app.session(self.headers.get('Cookie'))
-        with self.session['lock']:
-            if self.session['chat'].get('version') != VERSION:
-                self.session['chat']=chatbot.new_state()
+    def setup_session(self):self.token,self.session=app.session(self.headers.get('Cookie'))
     def state(self):
         s=self.session['chat']
         return {'csrf':self.session['csrf'],'connected':bool(os.environ.get('GROQ_API_KEY')),
@@ -62,8 +57,13 @@ def handler(app):
             cid=parse_qs(urlsplit(self.path).query).get('id',[''])[0]
             case=app.store.get(cid)
             if not case or case['owner']!=self.token:return self.reply('Case unavailable',404,'text/plain')
-            public=public_case(case)
-            body='<h1>Application '+html.escape(cid[:8])+'</h1><p>'+html.escape(public['status'])+'</p><p>'+html.escape(public['message'])+'</p>'
+            a=case['assessment'];g=case['generation']
+            source=''.join('<li><b>'+html.escape(c['id']+' '+c['title'])+'</b>: '+html.escape(c['text'])+'</li>' for c in a['evidence'])
+            body=f'<h1>Case {html.escape(cid[:8])}</h1><p>Provisional recommendation: {html.escape(a["recommendation"])} · score {a["probability"]:.1%}</p><p>LLM: {html.escape(g["status"])}</p><h2>Retrieved policy</h2><ul>{source}</ul>'
+            if case['reviews']:
+                r=case['reviews'][-1];body+='<h2>Human decision</h2><p>'+html.escape(r['decision']+' — '+r['note'])+'</p>'
+            else:
+                body+=f'''<h2>Human review</h2><form method="post" action="/review-case"><input type="hidden" name="csrf" value="{self.session['csrf']}"><input type="hidden" name="case_id" value="{html.escape(cid)}"><select name="decision"><option>More information required</option><option>Rejected</option><option>Approved</option></select><p><textarea name="note" minlength="20" required placeholder="Officer reason, at least 20 characters"></textarea></p><p><label><input type="checkbox" name="reviewed" value="yes" required> I reviewed the facts and policy</label></p><p><label><input type="checkbox" name="exception" value="yes"> I acknowledge a policy exception, if needed</label></p><button>Record decision</button></form>'''
             return self.reply('<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Case review</title><style>body{font:16px Arial;max-width:800px;margin:2em auto;padding:1em;line-height:1.5}textarea{width:100%;min-height:90px}li{margin:1em 0}</style></head><body><p><a href="/">← Back to chat</a></p>'+body+'</body></html>',ctype='text/html; charset=utf-8')
         if self.path in ('/','/chat'):return self.reply((ROOT/'chat.html').read_text(),ctype='text/html; charset=utf-8')
         if self.path=='/chat.js':return self.reply((ROOT/'chat.js').read_text(),ctype='application/javascript; charset=utf-8')
@@ -77,7 +77,13 @@ def handler(app):
             size=int(self.headers.get('Content-Length','0'))
             if not 0<size<=4096:raise ValueError('Invalid message length.')
             if self.path=='/review-case':
-                return self.reply(json.dumps({'error':'Customer sessions cannot record lending decisions.'}),403)
+                form={k:v[0] for k,v in parse_qs(self.rfile.read(size).decode()).items()}
+                if not hmac.compare_digest(form.get('csrf',''),self.session['csrf']):raise ValueError('Session expired.')
+                case=app.store.get(form.get('case_id',''))
+                if not case or case['owner']!=self.token:raise ValueError('Case unavailable.')
+                if form.get('reviewed')!='yes':raise ValueError('Review the case first.')
+                app.store.review(form['case_id'],form.get('decision',''),form.get('note',''),form.get('exception')=='yes',app.policy.fingerprint)
+                self.send_response(303);self.send_header('Location','/case?id='+form['case_id']);self.send_header('Set-Cookie',f'cedar_chat={self.token}; HttpOnly; SameSite=Strict; Path=/');self.end_headers();return
             obj=json.loads(self.rfile.read(size))
             if not isinstance(obj,dict) or not hmac.compare_digest(str(obj.get('csrf','')),self.session['csrf']):raise ValueError('Session expired. Reload the page.')
             if self.path=='/api/reset':

@@ -7,8 +7,8 @@ function bubble(m,animate=false){
  const meta=document.createElement('div');meta.className='meta';
  meta.textContent=m.role==='user'?'You':'Cedar · '+(m.kind||'loan assistant');
  const content=document.createElement('div');content.className='message-text';content.textContent=m.text;el.append(meta,content);
-
- if(m.case_id){const link=document.createElement('a');link.className='case';link.href='/case?id='+encodeURIComponent(m.case_id);link.textContent='Application status · verification pending ↗';el.append(link)}return el;
+ if(m.sources?.length){const details=document.createElement('details');details.className='sources';const summary=document.createElement('summary');summary.textContent='Policy evidence · '+m.sources.length+' clauses';details.append(summary);for(const c of m.sources){const article=document.createElement('article'),title=document.createElement('b'),p=document.createElement('p');title.textContent=c.id+' · '+c.title;p.textContent=c.text;article.append(title,p);details.append(article)}el.append(details)}
+ if(m.case_id){const link=document.createElement('a');link.className='case';link.href='/case?id='+encodeURIComponent(m.case_id);link.textContent='Open case · human review pending ↗';el.append(link)}return el;
 }
 function scrollDown(){feed.scrollTo({top:feed.scrollHeight,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'})}
 function render(s,initial=false){
