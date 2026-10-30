@@ -82,9 +82,11 @@ with chat_tab:
     for message in chatbot.grouped_messages(state['messages']):
         user = message['role'] == 'user'
         kind = message.get('kind', 'guide')
+        generated = kind == 'assessment explanation'
         with st.chat_message('user' if user else 'assistant', avatar=None if user else '🌿'):
             if not user:
-                label = 'Cedar · your eligibility result' if message.get('case_id') else 'Cedar · '+kind
+                label = ('Assessment · provisional explanation' if message.get('case_id') and generated
+                         else 'Cedar · '+kind)
                 st.caption(label)
             st.text(message['text'])
             if message.get('sources'):
