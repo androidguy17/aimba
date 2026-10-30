@@ -83,7 +83,7 @@ st.caption('Ask about loan eligibility, fictional lending policy, or an assessme
 st.info('Cedar supports lending questions only. Policy answers show source clauses; assessments need human review.')
 chat_tab, cases_tab = st.tabs(['Conversation', 'My demo cases'])
 with chat_tab:
-    for message in state['messages']:
+    for message in chatbot.grouped_messages(state['messages']):
         user = message['role'] == 'user'
         kind = message.get('kind', 'guide')
         generated = kind == 'assessment explanation'

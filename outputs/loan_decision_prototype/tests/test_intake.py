@@ -145,6 +145,24 @@ class IntakeTests(unittest.TestCase):
         self.assertEqual(state['draft']['loan_amount'],500000)
         self.assertEqual(state['step'],1)
 
+    def test_each_intake_turn_is_one_complete_assistant_reply(self):
+        from loan_core import DEMO_CASES
+        state=chatbot.new_state();app=SimpleNamespace(policy=Policy())
+        state['draft']={name:value for name,value in DEMO_CASES['approval'].items() if name not in ('employment_years','employment_type')}
+        state['step']=6
+        before=len(state['messages'])
+        chatbot.handle(state,'i have been working for 18 months',app,'owner','')
+        self.assertEqual(len(state['messages'])-before,2)  # One user message, one reply.
+        reply=state['messages'][-1]
+        self.assertIn('you’ve been working for 1.5 years',reply['text'])
+        self.assertIn('salaried, self-employed, or a freelancer',reply['text'])
+        before=len(state['messages'])
+        chatbot.handle(state,'I am salaried',app,'owner','')
+        self.assertEqual(len(state['messages'])-before,2)
+        self.assertEqual(state['messages'][-1]['kind'],'confirm')
+        self.assertIn('Employment: salaried',state['messages'][-1]['text'])
+        self.assertIn('Please check these synthetic details',state['messages'][-1]['text'])
+
     def test_policy_question_during_application_does_not_consume_a_field(self):
         state=chatbot.new_state();app=SimpleNamespace(policy=Policy())
         chatbot.handle(state,'Check my eligibility',app,'owner','')

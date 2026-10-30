@@ -50,7 +50,7 @@ def handler(app):
     def state(self):
         s=self.session['chat']
         return {'csrf':self.session['csrf'],'connected':bool(os.environ.get('GROQ_API_KEY')),
-            'messages':s['messages'],'draft_active':s['draft'] is not None,'ready':s['draft'] is not None and s['step']==len(chatbot.FIELDS)}
+            'messages':chatbot.grouped_messages(s['messages']),'draft_active':s['draft'] is not None,'ready':s['draft'] is not None and s['step']==len(chatbot.FIELDS)}
     def do_GET(self):
         self.setup_session()
         if urlsplit(self.path).path=='/case':

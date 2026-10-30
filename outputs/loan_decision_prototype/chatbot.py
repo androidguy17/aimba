@@ -13,8 +13,21 @@ FIELDS=[('income','How much do you earn? You can say “16 lakh per year” or �
 WELCOME='Hi! I’m Cedar’s loan assistant. Ask about our fictional lending policy or choose Check my eligibility. I can help only with loans and policy guidance. Every recommendation needs human review. Use synthetic examples only.'
 
 def new_state():return {'messages':[{'role':'assistant','text':WELCOME,'kind':'welcome'}],'draft':None,'step':0,'previous_question':'','last_assessment':None,'busy':False}
+def grouped_messages(messages):
+    """One assistant bubble per user turn, including history from older sessions."""
+    grouped=[]
+    for message in messages:
+        message=dict(message)
+        if grouped and message['role']=='assistant' and grouped[-1]['role']=='assistant':
+            text=grouped[-1]['text']+'\n\n'+message['text']
+            grouped[-1].update(message)
+            grouped[-1]['text']=text
+        else:
+            grouped.append(message)
+    return grouped
+
 def add(state,text,role='assistant',**extras):
-    state['messages'].append({'role':role,'text':text,**extras});state['messages']=state['messages'][-40:]
+    state['messages']=grouped_messages(state['messages']+[{'role':role,'text':text,**extras}])[-40:]
 def number(text,key):
     return intake.numeric(text,key)
 
@@ -23,6 +36,7 @@ def understood(name,value):
         period=' per year' if name=='income' else ' per month' if name=='monthly_debt' else ''
         return name.replace('_',' ').capitalize()+f': ₹{value:,}'+period
     if name=='employment_type':return 'Employment: '+value.replace('_',' ')
+    if name=='employment_years':return f'you’ve been working for {value:g} '+('year' if value==1 else 'years')
     unit=' months' if name=='term_months' else ' years' if name=='employment_years' else ''
     return name.replace('_',' ').capitalize()+f': {value:g}'+unit
 
