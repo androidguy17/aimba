@@ -94,3 +94,12 @@ For policy chat the model can select up to three retrieved clause IDs. The serve
 Assessment explanations are a separate, fixed-purpose task using validated application fields. Existing checks preserve the provisional recommendation, exact citations and human review. Public response checks also withhold the excluded brand name, including common Unicode and punctuation variations. Dashboard labels use Cedar branding; demo-data and external-service disclosures remain accurate.
 
 Run `python3 -m unittest discover -s tests -v` from this folder. Tests cover off-topic requests, loan-keyword bait, instruction overrides, malformed model outputs, history poisoning, brand-name variants and the application flow. These controls limit output capability; keyword matching alone is not a security guarantee. Assessment prose still needs human factual review. Policy files are trusted operator-controlled content. A running or hosted instance must be restarted or redeployed after updating these files; existing browser sessions should start a new conversation.
+
+
+## Conversational eligibility intake
+
+Eligibility accepts complete sentences, common rupee abbreviations (`10k`, `16 lac`, `16 LPA`), English number words, and explicit monthly/yearly income. Monthly income is annualized; repayment years are converted to months. A short acknowledgement displays the normalized value. The final summary must still be confirmed before assessment.
+
+`intake.py` handles common formats locally without a provider key. For more complex wording, multiple labeled details or corrections, the configured model performs a bounded JSON extraction task. Only known application fields are accepted, source spans must appear in the current message, numeric values must pass server-side bounds, and locally readable sources must agree with the model’s conversions. Model prose is never displayed. Ambiguous alternatives and unsupported currencies request clarification. Multi-field extraction skips details already supplied; it does not change the lending model or automatically submit an assessment.
+
+The extraction request sends the current application answer and requested field to the external service when the local parser cannot handle it. Unrelated instruction requests remain blocked. Include `intake.py` in all deployments. Run `python3 -m unittest discover -s tests -v` for format, conversion, ambiguity, grounding, correction, full-flow and existing guardrail regressions.

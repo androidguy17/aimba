@@ -76,7 +76,7 @@ with st.sidebar:
             process('Start over')
             st.rerun()
     st.divider()
-    st.caption('Use synthetic details only. Loan questions and submitted assessment details may be sent to an external AI service for policy selection and explanations. Cases are temporary on cloud hosting.')
+    st.caption('Use synthetic details only. Loan questions, application answers that need interpretation, and submitted assessment details may be sent to an external AI service. Cases are temporary on cloud hosting.')
 
 st.title('Chat with Cedar')
 st.caption('Ask about loan eligibility, fictional lending policy, or an assessment.')
