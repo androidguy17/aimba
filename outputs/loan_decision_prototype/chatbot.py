@@ -62,6 +62,10 @@ def handle(state,text,app,owner,key):
         state['last_assessment']={'recommendation':assessment['recommendation'],'input':assessment['input'],'flags':assessment['flags'],'scope_supported':assessment['scope_supported']}
         state['previous_question']='loan assessment recommendation '+assessment['recommendation']+' '+ ' '.join(f['message'] for f in assessment['flags'])
         state['draft']=None;state['step']=0;return
+    # A natural loan request may start intake and supply facts in the same turn.
+    if state['draft'] is None and re.match(r'(?i)^(?:check my eligibility\b|i (?:want|need|would like)(?: to (?:borrow|apply))?(?: a)? loan\b|i want to borrow\b)',text) and re.search(r'(?i)\d|\b(lakh|lac|thousand|income|salary|score)\b',text):
+        state['draft']={};state['step']=0
+        add(state,'Let’s check your eligibility. I’ll record the details you share and ask for anything missing.',kind='guide')
     # Interpret application facts before policy routing, including complete sentences.
     active=state['draft'] is not None
     policy_question=bool(re.match(r'(?i)^(?:/?ask |what (?:is|are)|how (?:does|do)|why |can (?:i|you)|is (?:there|it))',text))

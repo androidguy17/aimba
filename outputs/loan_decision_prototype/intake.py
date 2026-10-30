@@ -54,6 +54,11 @@ def numeric(text, field, check=True):
         raise Clarify('What single value should I use? I won’t choose between amounts for you.')
     if re.search(r'\b(usd|dollars?|eur|euros?|gbp|pounds?)\b|[$€£]',text):
         raise Clarify('Please provide the amount in Indian rupees so I don’t assume an exchange rate.')
+    if re.search(r"\b(?:don'?t know|do not know|no idea|not sure|cannot remember)\b",text):
+        raise Clarify('Please check your records and tell me when you know the value. I won’t assume zero.')
+    if field in ('monthly_debt','late_payments') and not re.search(r'\d',text):
+        if re.fullmatch(r"i (?:don'?t|do not)[.! ]*",text) or (re.search(r"\b(?:don'?t|do not|haven'?t|have not)\b",text) and re.search(r'\b(debts?|emis?|payments?|owe)\b',text)):
+            return 0
     if field in ('monthly_debt','late_payments') and re.fullmatch(r"(?:i have |there (?:is|are) |i pay )?(?:no|none|nothing|nil|zero)(?: (?:debt|debts|emi|emis|late payments?|missed payments?))?[.! ]*",text):
         return 0
     normalized = text.replace(',','').replace('₹',' ').replace('-',' ')
@@ -125,6 +130,8 @@ def extract(text, field, key=''):
         raise Clarify('What single value should I use? I won’t choose between amounts for you.')
     if re.search(r'\b(usd|dollars?|eur|euros?|gbp|pounds?)\b|[$€£]',clean(text)):
         raise Clarify('Please provide amounts in Indian rupees; I won’t assume an exchange rate.')
+    if re.search(r"\b(?:don'?t know|do not know|no idea|not sure|cannot remember)\b",clean(text)):
+        raise Clarify('Please check your records first. I won’t guess or assume zero.')
     parser=employment if field=='employment_type' else lambda value:numeric(value,field)
     # Multiple labeled facts need extraction; a single ordinary answer works without a key.
     multiple=bool(re.search(r'[,;]|\band\b',text,re.I) and len(re.findall(r'\b(income|earn|salary|debt|emi|borrow|loan|score|employment|experience)\b',text,re.I))>1)
@@ -166,7 +173,7 @@ def extract(text, field, key=''):
             value=validate(value,name)
             source_tokens=set(re.findall(r'[a-z]+',clean(source)))
             if not (re.search(r'\d',source) or source_tokens & (NUMBER_WORDS-{'a','an','and'})
-                    or (value==0 and name in ('monthly_debt','late_payments') and source_tokens & {'no','none','nothing','nil'})):
+                    or (value==0 and name in ('monthly_debt','late_payments') and source_tokens & {'no','none','nothing','nil','dont','don','not'})):
                 raise Clarify('I couldn’t find a value in that answer. Could you clarify it?')
         # If the source is locally readable, the model must agree with its units/value.
         try: grounded=employment(source) if name=='employment_type' else numeric(source,name,check=False)

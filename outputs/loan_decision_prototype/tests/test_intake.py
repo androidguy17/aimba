@@ -14,7 +14,7 @@ class IntakeTests(unittest.TestCase):
             ('I earn 50k a month','income',600000),('my salary is fifty thousand a month','income',600000),
             ('16 LPA','income',1600000),('₹1,600,000 per year','income',1600000),
             ('my EMIs are 10k','monthly_debt',10000),('ten thousand','monthly_debt',10000),
-            ('no debt','monthly_debt',0),('none','late_payments',0),
+            ('no debt','monthly_debt',0),('i dont','monthly_debt',0),("I don't have any debt",'monthly_debt',0),('none','late_payments',0),
             ('five lakh rupees','loan_amount',500000),('2.5 lakhs','loan_amount',250000),
             ('two and a half lakh','loan_amount',250000),('one point five lakh','loan_amount',150000),
             ('a couple of lakhs','loan_amount',200000),('one lakh fifty thousand','loan_amount',150000),
@@ -26,7 +26,7 @@ class IntakeTests(unittest.TestCase):
 
     def test_ambiguous_or_unsupported_values_do_not_call_model(self):
         with patch('groq_rag.complete') as model:
-            for text in ['10k or 20k','between 10 and 20 lakh','10-20 lakh','$10000','100 euros']:
+            for text in ['10k or 20k','between 10 and 20 lakh','10-20 lakh','$10000','100 euros',"I don't know",'no idea']:
                 with self.subTest(text=text),self.assertRaises(intake.Clarify):intake.extract(text,'income','test')
             model.assert_not_called()
         for text in ['nan','inf','-50000','-5 lakh','36.5']:
@@ -86,6 +86,14 @@ class IntakeTests(unittest.TestCase):
             chatbot.handle(state,'Actually my annual income is 18 lakh',app,'owner','test')
         self.assertEqual(state['draft']['income'],1800000)
         self.assertEqual(state['step'],2)
+
+    def test_natural_loan_request_can_start_and_prefill_application(self):
+        state=chatbot.new_state();app=SimpleNamespace(policy=Policy())
+        with patch('intake.extract',return_value={'income':720000,'loan_amount':500000,'credit_score':500,'employment_type':'salaried'}):
+            chatbot.handle(state,'I need a loan for 5 lac, my income is 60k per month and I am a salaried employee and my credit score is 500',app,'owner','test')
+        self.assertEqual(state['draft']['income'],720000)
+        self.assertEqual(state['draft']['loan_amount'],500000)
+        self.assertEqual(state['step'],1)
 
     def test_policy_question_during_application_does_not_consume_a_field(self):
         state=chatbot.new_state();app=SimpleNamespace(policy=Policy())
