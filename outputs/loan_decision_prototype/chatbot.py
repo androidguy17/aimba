@@ -53,6 +53,34 @@ def summary(state):
     lines.append(CONFIRM_HELP)
     add(state,'\n'.join(lines),kind='confirm')
 
+def assessment_message(assessment,generation):
+    """Customer copy; full scores, citations and generated reasons remain in the case record."""
+    if not assessment['scope_supported']:
+        title='Your application needs a specialist review.'
+    elif assessment['recommendation']=='Approve':
+        title='Your initial check recommends approval, subject to review.'
+    else:
+        title='Your initial check does not recommend approval for this loan.'
+    if generation['status']=='generated':
+        explanation=generation['draft']['summary']
+    else:
+        reasons={
+            'P01':'This loan policy does not cover your type of employment.',
+            'P02':'Your income is below the usual requirement for this loan.',
+            'P03':'Your credit score is below the usual requirement.',
+            'P04':'Your current debt payments, together with the estimated payment for this loan, would take up more of your income than the policy normally allows.',
+            'P05':'The late payments you reported need a closer review.',
+            'P06':'Your requested amount or repayment period needs a closer review against the loan limits and your income.',
+            'P07':'This check needs extra review before you can rely on its result.',
+        }
+        clauses=dict.fromkeys(flag['clause'] for flag in assessment['flags'])
+        explanation=' '.join(reasons.get(cid,'A loan officer needs to review a policy requirement.') for cid in clauses)
+        if not explanation:
+            explanation='This result is based on the financial details you shared.'
+    return (title+'\n\n'+explanation+
+            '\n\nThis is not a final loan decision. A loan officer must review your details before a decision can be made.'+
+            '\n\nIf any details are incorrect, choose Start over to update them. You can also ask for a human review.')
+
 def handle(state,text,app,owner,key):
     text=text.strip()
     if not text or len(text)>1500:raise ValueError('Please send a message of 1–1,500 characters.')
@@ -71,13 +99,8 @@ def handle(state,text,app,owner,key):
         assessment=loan_core.assess(app.model,state['draft'],app.policy)
         generation=groq_rag.explain(assessment,key)
         cid=app.store.create(owner,assessment,generation)
-        title='Human specialist review required' if not assessment['scope_supported'] else 'Provisional recommendation: '+assessment['recommendation']
-        message=f'{title}\nLocal model: {assessment["recommendation"]} · Synthetic repayment score: {assessment["probability"]:.1%}\nThis is not a final loan decision.'
-        if assessment['flags']:message+='\n\nPolicy flags:\n'+'\n'.join(f'[{f["clause"]}] {f["message"]}' for f in assessment['flags'])
-        if generation['status']=='generated':
-            message+='\n\n'+generation['draft']['summary']+'\n\n'+'\n'.join(f'[{r["clause_id"]}] {r["explanation"]}' for r in generation['draft']['reasons'])
-        else:message+='\n\n'+generation['message']
-        add(state,message,kind='assessment explanation' if generation['status']=='generated' else 'local assessment',sources=assessment['evidence'],case_id=cid)
+        add(state,assessment_message(assessment,generation),kind='your eligibility result',
+            sources=assessment['evidence'],case_id=cid)
         state['last_assessment']={'recommendation':assessment['recommendation'],'input':assessment['input'],'flags':assessment['flags'],'scope_supported':assessment['scope_supported']}
         state['previous_question']='loan assessment recommendation '+assessment['recommendation']+' '+ ' '.join(f['message'] for f in assessment['flags'])
         state['draft']=None;state['step']=0;return

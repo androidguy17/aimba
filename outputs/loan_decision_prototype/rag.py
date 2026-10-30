@@ -12,7 +12,14 @@ If scope_supported is false, say that the policy does not cover this applicant a
 Do not invent rates, rules, documents, guarantees, legal claims or missing facts. The score is from synthetic data.
 Return one JSON object only with these keys:
 recommendation: the exact supplied Approve or Reject value;
-summary: a concise explanation of at most 100 words;
+summary: a customer-facing explanation of at most 70 words, in two or three short sentences;
+Speak directly to the customer as "you" and "your", never "the applicant".
+Explain the main reasons in everyday language. For example, say "your existing payments plus this loan's estimated payment would take up too much of your income" instead of "total debt-service ratio exceeds the threshold".
+Cover the applicable policy concerns without repeating the result, policy quotes or review disclaimer; the app displays those separately.
+Do not put clause IDs, model scores, percentages, feature contributions, technical terms such as threshold or manual exception review, or provider details in the summary.
+Do not describe employment length or credit history as a failed policy requirement unless the supplied policy flags actually say so. Do not invent a cause for the recommendation.
+If scope is unsupported, clearly explain that this loan policy does not cover the customer's situation.
+The reasons below are the detailed evidence record and may contain exact policy terms;
 human_review_required: true;
 reasons: a list of objects with clause_id, policy_quote, and explanation.
 Every policy_quote must be an exact substring of the retrieved clause with that ID, at least 15 characters long.
