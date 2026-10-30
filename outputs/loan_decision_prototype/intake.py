@@ -8,6 +8,9 @@ import loan_core
 class Clarify(ValueError):
     pass
 
+class UnsupportedValue(Clarify):
+    pass
+
 MONEY = {'income', 'monthly_debt', 'loan_amount'}
 ONES = dict(zip('zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen'.split(), range(20)))
 ONES.update(dict(zip('twenty thirty forty fifty sixty seventy eighty ninety'.split(), range(20,100,10))))
@@ -25,7 +28,7 @@ def validate(value, field):
         raise Clarify('Please tell me the amount or value you mean.')
     lo, hi = loan_core.LIMITS[field]
     if not lo <= value <= hi:
-        raise Clarify(f'That {field.replace("_"," ")} is outside the supported range ({lo:,}–{hi:,}). Please check it against your records.')
+        raise UnsupportedValue(f'That {field.replace("_"," ")} is outside the supported range ({lo:,}–{hi:,}). Please check it against your records.')
     if field != 'employment_years' and not float(value).is_integer():
         raise Clarify('Could you give that as a whole number?')
     return float(value) if field == 'employment_years' else int(value)
@@ -144,7 +147,7 @@ def local_facts(text):
         try:
             value=employment(span) if name=='employment_type' else numeric(span,name)
         except Clarify as exc:
-            errors[name]=str(exc)
+            errors[name]=exc
             continue
         if name in values and values[name]!=value:
             raise Clarify('I found different values for your '+name.replace('_',' ')+'. Which one should I use?')
@@ -188,6 +191,8 @@ def extract(text, field, key=''):
     explicit={name for name,pattern in labels.items() if re.search(pattern,text,re.I)}
     if explicit and field not in explicit: multiple=True
     local_values,local_errors=local_facts(text)
+    for error in local_errors.values():
+        if isinstance(error,UnsupportedValue):raise error
     if local_values:
         # Explicit labels take priority over the currently requested field.
         return local_values

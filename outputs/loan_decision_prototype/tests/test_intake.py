@@ -65,6 +65,16 @@ class IntakeTests(unittest.TestCase):
         with self.assertRaises(intake.Clarify):
             intake.extract('My income is 16 lakh and income is 20 lakh','income','')
 
+    def test_out_of_range_loan_is_explained_without_provider_request(self):
+        state=chatbot.new_state();app=SimpleNamespace(policy=Policy())
+        with patch('groq_rag.complete') as model:
+            chatbot.handle(state,'i want loan of 60 lacs',app,'owner','test')
+            model.assert_not_called()
+        self.assertIn('loan amount is outside the supported range',state['messages'][-1]['text'])
+        self.assertIn('2,000,000',state['messages'][-1]['text'])
+        self.assertIn('How much do you earn?',state['messages'][-1]['text'])
+        self.assertEqual(state['draft'],{})
+
     def test_service_failure_is_reported_honestly_and_repeats_next_question(self):
         import groq_rag
         state=chatbot.new_state();app=SimpleNamespace(policy=Policy())
