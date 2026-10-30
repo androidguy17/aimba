@@ -1,5 +1,6 @@
 """Conversational loan-field extraction; never makes decisions or returns model prose."""
 import math
+import logging
 import re
 import unicodedata
 import loan_core
@@ -65,6 +66,7 @@ def numeric(text, field, check=True):
     normalized = re.sub(r'(\d)([a-z])',r'\1 \2',normalized)
     normalized = re.sub(r'\ba (month|year)\b',r'per \1',normalized)
     normalized = re.sub(r'\band a half\b','point five',normalized)
+    normalized = re.sub(r'\bhalf a[n]?\b','0.5',normalized)
     normalized = re.sub(r'\b(?:a )?couple of\b','two',normalized)
     tokens = re.findall(r'\d+(?:\.\d+)?|[a-z]+',normalized)
     spans=[]; current=[]
@@ -104,11 +106,50 @@ def employment(text):
     text=clean(text)
     if BAD.search(text): raise Clarify('Please provide only your employment information.')
     own=bool(re.search(r'self[ _-]?employed|freelanc|own (?:a |my )?(?:business|company)|business owner|entrepreneur',text))
-    salary=bool(re.search(r'\bsalaried\b|\bsalary\b|full[ -]?time|\bemployee\b|work (?:for|at) (?:a |an |the )?company',text))
+    salary=bool(re.search(r'\bsalar[i]+ed\b|\bsalary\b|full[ -]?time|\bemployee\b|work (?:for|at) (?:a |an |the )?company',text))
     if own and salary: raise Clarify('Should I record salaried or self-employed as your main employment type?')
     if own:return 'self_employed'
     if salary:return 'salaried'
     raise Clarify('Are you mainly salaried or self-employed? You can describe how you work.')
+
+
+# Labels bound each fact to its own text span, so several facts do not become one amount.
+LOCAL_LABELS = [
+    ('late_payments',r'late payments?|missed payments?'),
+    ('credit_score',r'credit score|cibil(?: score)?|score'),
+    ('monthly_debt',r'(?:existing |monthly )?debts?|emis?|owe'),
+    ('income',r'(?:(?:monthly|annual|yearly|gross|net) )?(?:income|salary)|earn(?:ing)?|ctc'),
+    ('loan_amount',r'loan(?: amount)?|borrow(?:ing)?'),
+    ('term_months',r'tenure|repay(?:ment)?(?: (?:it |the loan )?(?:over|in))?|term'),
+    ('employment_years',r'(?:employment |work )?experience|worked for|working for'),
+    ('employment_type',r'salar[i]+ed|self[ _-]?employed|freelanc(?:er|ing)?|employee|business owner|own (?:a |my )?(?:business|company)'),
+]
+LABEL_PATTERN = re.compile(r'\b(?:'+'|'.join('(?P<f'+str(i)+'>'+pattern+')' for i,(_,pattern) in enumerate(LOCAL_LABELS))+r')\b',re.I)
+
+
+def local_facts(text):
+    """Extract independently labeled facts without any network dependency.
+
+    Unsupported spans remain unfilled. The next question requests the missing detail;
+    a failed provider must never discard facts that were already understood locally.
+    """
+    text=clean(text)
+    matches=list(LABEL_PATTERN.finditer(text))
+    values={}
+    errors={}
+    for i,match in enumerate(matches):
+        name=LOCAL_LABELS[int(match.lastgroup[1:])][0]
+        end=matches[i+1].start() if i+1<len(matches) else len(text)
+        span=text[match.start():end]
+        try:
+            value=employment(span) if name=='employment_type' else numeric(span,name)
+        except Clarify as exc:
+            errors[name]=str(exc)
+            continue
+        if name in values and values[name]!=value:
+            raise Clarify('I found different values for your '+name.replace('_',' ')+'. Which one should I use?')
+        values[name]=value
+    return values,errors
 
 
 EXTRACTION_PROMPT = '''Extract only explicitly supplied loan application facts from the user's text.
@@ -146,6 +187,10 @@ def extract(text, field, key=''):
     }
     explicit={name for name,pattern in labels.items() if re.search(pattern,text,re.I)}
     if explicit and field not in explicit: multiple=True
+    local_values,local_errors=local_facts(text)
+    if local_values:
+        # Explicit labels take priority over the currently requested field.
+        return local_values
     local_error=None
     if not multiple:
         try:return {field:parser(text)}
@@ -155,8 +200,9 @@ def extract(text, field, key=''):
     import groq_rag
     try:
         draft,_,_=groq_rag.complete(EXTRACTION_PROMPT,{'requested_field':field,'text':text},key)
-    except groq_rag.GroqError:
-        raise local_error or Clarify('I couldn’t interpret all those details. Please try one detail at a time.') from None
+    except groq_rag.GroqError as exc:
+        logging.getLogger(__name__).warning('Application extraction service unavailable: %s',str(exc))
+        raise Clarify('The language service is temporarily unavailable. I haven’t guessed any values. You can still give this detail in digits, words or abbreviations.') from None
     if set(draft)!={'fields','unclear'} or type(draft['unclear']) is not bool or not isinstance(draft['fields'],dict):
         raise Clarify('I couldn’t confidently read those details. Could you rephrase them?')
     if draft['unclear'] or not draft['fields']:raise local_error or Clarify('Could you clarify the value you want me to use?')

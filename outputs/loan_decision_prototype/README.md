@@ -103,3 +103,8 @@ Eligibility accepts complete sentences, common rupee abbreviations (`10k`, `16 l
 `intake.py` handles common formats locally without a provider key. For more complex wording, multiple labeled details or corrections, the configured model performs a bounded JSON extraction task. Only known application fields are accepted, source spans must appear in the current message, numeric values must pass server-side bounds, and locally readable sources must agree with the model’s conversions. Model prose is never displayed. Ambiguous alternatives and unsupported currencies request clarification. Multi-field extraction skips details already supplied; it does not change the lending model or automatically submit an assessment.
 
 The extraction request sends the current application answer and requested field to the external service when the local parser cannot handle it. Unrelated instruction requests remain blocked. Include `intake.py` in all deployments. Run `python3 -m unittest discover -s tests -v` for format, conversion, ambiguity, grounding, correction, full-flow and existing guardrail regressions.
+
+
+### Intake during service outages
+
+Common multi-detail sentences are now split into labeled facts and validated locally before any external extraction request. Recognized values are preserved and the next missing field is asked for, even if no language service is connected. Ambiguous duplicate values request clarification. If an uncommon phrase still needs the external service and that call fails, the app reports service unavailability, repeats the requested question and logs the sanitized provider error for the operator; it no longer presents an outage as an input-format mistake.

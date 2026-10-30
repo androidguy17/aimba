@@ -79,7 +79,8 @@ def handle(state,text,app,owner,key):
             values=intake.extract(text,field,key)
         except intake.Clarify as exc:
             # Clarification stays in the application, never becomes a general chat task.
-            add(state,str(exc),kind='question');return
+            prompt=FIELDS[state['step']][1] if state['step']<len(FIELDS) else 'You can correct a detail or choose Confirm assessment.'
+            add(state,str(exc)+'\n\n'+prompt,kind='question');return
         state['draft'].update(values)
         state['step']=next((i for i,(name,_) in enumerate(FIELDS) if name not in state['draft']),len(FIELDS))
         add(state,'Got it — '+ '; '.join(understood(name,value) for name,value in values.items())+'.',kind='details recorded')

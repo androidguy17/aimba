@@ -38,12 +38,52 @@ class IntakeTests(unittest.TestCase):
             self.assertEqual(intake.employment(text),wanted)
         with self.assertRaises(intake.Clarify):intake.employment('I am salaried and self-employed')
 
-    def test_model_can_extract_multiple_grounded_facts(self):
+    def test_multiple_grounded_facts_work_locally_without_provider(self):
         text='I earn 50k a month, my EMI is 10k and my credit score is 750'
         draft={'fields':{'income':{'value':600000,'source':'50k a month'},
             'monthly_debt':{'value':10000,'source':'10k'},'credit_score':{'value':750,'source':'750'}},'unclear':False}
         with patch('groq_rag.complete',return_value=(draft,'test',None)) as model:
             self.assertEqual(intake.extract(text,'income','test'),{'income':600000,'monthly_debt':10000,'credit_score':750})
+            model.assert_not_called()
+
+    def test_complete_natural_request_with_typo_needs_no_provider(self):
+        text='i need a loan for 5 lac, my income is 60k per month and i am salariied employee and my credit score is 500'
+        with patch('groq_rag.complete',side_effect=AssertionError('Network must not be used')):
+            values=intake.extract(text,'income','test')
+        self.assertEqual(values,{'loan_amount':500000,'income':720000,'employment_type':'salaried','credit_score':500})
+        state=chatbot.new_state();app=SimpleNamespace(policy=Policy())
+        with patch('groq_rag.complete',side_effect=AssertionError('Network must not be used')):
+            chatbot.handle(state,text,app,'owner','test')
+        self.assertEqual(state['draft'],values)
+        self.assertEqual(state['step'],1)
+        self.assertIn('existing debt',state['messages'][-1]['text'])
+
+    def test_local_partial_values_are_kept_when_other_facts_are_unclear(self):
+        with patch('groq_rag.complete',side_effect=AssertionError('Network must not be used')):
+            values=intake.extract('My income is 16 lakh yearly, credit score unavailable','income','test')
+        self.assertEqual(values,{'income':1600000})
+        with self.assertRaises(intake.Clarify):
+            intake.extract('My income is 16 lakh and income is 20 lakh','income','')
+
+    def test_service_failure_is_reported_honestly_and_repeats_next_question(self):
+        import groq_rag
+        state=chatbot.new_state();app=SimpleNamespace(policy=Policy())
+        chatbot.handle(state,'Check my eligibility',app,'owner','')
+        with patch('groq_rag.complete',side_effect=groq_rag.GroqError('Groq free-tier rate limit reached.')):
+            with self.assertLogs('intake',level='WARNING'):
+                chatbot.handle(state,'something not understood',app,'owner','test')
+        message=state['messages'][-1]['text']
+        self.assertIn('service is temporarily unavailable',message)
+        self.assertIn('How much do you earn?',message)
+        self.assertNotIn('couldn’t interpret',message)
+        self.assertEqual(state['draft'],{})
+
+    def test_complex_fallback_still_checks_source_and_normalization(self):
+        text='My pay works out to half a million rupees annually'
+        draft={'fields':{'income':{'value':500000,'source':'half a million rupees annually'}},'unclear':False}
+        # This phrase requires the semantic extractor; emulate its structured response.
+        with patch('intake.local_facts',return_value=({},{})), patch('intake.numeric',side_effect=intake.Clarify('clarify')), patch('groq_rag.complete',return_value=(draft,'mock',None)) as model:
+            self.assertEqual(intake.extract(text,'income','test'),{'income':500000})
             self.assertEqual(set(model.call_args.args[1]),{'requested_field','text'})
 
     def test_unrelated_instructions_and_bad_model_results_cannot_be_saved(self):
